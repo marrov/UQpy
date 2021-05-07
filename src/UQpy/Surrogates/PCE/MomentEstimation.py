@@ -1,39 +1,38 @@
 import numpy as np
-class MomentEstimation:
+
+def pce_mean(pce):
     """
-    Class for estimating the moments of the PCE surrogate.
-
-    **Inputs:**
-
-    * **surr_object** ('class'):
-        Object that defines the surrogate model.
-
-    **Methods:**
+    Estimate the mean value of the QoI using its PCE approximation.
+    
+    **Inputs**
+    
+    * **pce** (`PCE object`)
+        PCE approximation of the QoI.
+    
+    **Output**
+        (`float` or `1darray`) Mean value of the QoI. 
     """
-
-    def __init__(self, surr_object):
-        self.surr_object = surr_object
-
-    def get(self):
-        """
-        Returns the first two moments of the PCE surrogate which are directly
-        estimated from the PCE coefficients.
-
-        **Outputs:**
-
-        * **mean, variance** (`tuple`)
-            Returns the mean and variance.
-
-        """
-        if self.surr_object.b is not None:
-            mean = self.surr_object.C[0, :] + np.squeeze(self.surr_object.b)
+    if pce.coefficients is None:
+        ValueError('PCE coefficients have not yet been computed.')
+    else:
+        if pce.bias is None:
+            return pce.coefficients[0, :]
         else:
-            mean = self.surr_object.C[0, :]
-
-        variance = np.sum(self.surr_object.C[1:] ** 2, axis=0)
-
-        if self.surr_object.C.ndim == 1 or self.surr_object.C.shape[1] == 1:
-            variance = float(variance)
-            mean = float(mean)
-
-        return np.round(mean, 4), np.round(variance, 4)
+            return pce.coefficients[0, :] + pce.bias
+        
+def pce_variance(pce):
+    """
+    Estimate the variance of the QoI using its PCE approximation.
+    
+    **Inputs**
+    
+    * **pce** (`PCE object`)
+        PCE approximation of the QoI.
+    
+    **Output**
+        (`float` or `1darray`) Variance of the QoI. 
+    """
+    if pce.coefficients is None:
+        ValueError('PCE coefficients have not yet been computed.')
+    else:
+        return np.sum(pce.coefficients[1:]**2, axis=0)

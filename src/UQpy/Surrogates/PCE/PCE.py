@@ -1,86 +1,139 @@
-from UQpy.Surrogates.PCE.PolyChaosLstsq import PolyChaosLstsq
-from UQpy.Surrogates.PCE.PolyChaosRidge import PolyChaosRidge
-from UQpy.Surrogates.PCE.PolyChaosLasso import PolyChaosLasso
+import numpy as np
 
 
-class PCE:
+class PolyChaosExp:
     """
-    Constructs a surrogate model based on the Polynomial Chaos Expansion (PCE)
-    method.
-
-    **Inputs:**
-
-    * **method** (class):
-        object for the method used for the calculation of the PCE coefficients.
-
-    **Methods:**
-
+    Class for the Polynomial Chaos Expansion.
+    
+    **Inputs**
+    
+    * **dist** (`UQpy distribution object`)
+        1d or Nd probability distribution characterizing the random input 
+        parameter(s)
+        
+    **Attributes**
+    
+    * **dist** (`UQpy distribution object`)
+        1d or Nd probability distribution characterizing the random input 
+        parameter(s)
+        
+    * **n_inputs** (`int`):
+        Number of input parameters
+    
+    * **n_outputs** (`int`):
+        Dimensions of the QoI
+    
+    * **midx_set** (`ndarray`):
+        Multiindex set the rows of which correspond to the orders of the 1d 
+        chaos polynomials that form the Nd chaos polynomial.
+        
+    * **n_polys** (`int`):
+        Size of polynomial basis, equiv., number of PCE terms
+        
+    * **coefficients** (`ndarray`):
+        PCE coefficients
+        
+    * **bias** (`float` or `1darray`):
+        Bias term in case LASSO or ridge regression are employed to estimate 
+        the PCE coefficients
+        
+    * **poly_basis** (`list`):
+        Contains the 1d or Nd chaos polynomials that form the PCE basis
+        
+    * **design_matrix** (`ndarray`):
+        Matrix containing the evaluations of the PCE basis on the experimental 
+        design that has been used to fit the PCE coefficients
+        
+    * **exp_design_in** (`ndarray`):
+        Realizations of the random parameter in the experimental design that 
+        has been used to fit the PCE coefficients
+    
+    * **exp_design_out** (`ndarray`):
+        Model outputs for the random parameter realizations of the 
+        experimental design that has been used to fit the PCE coefficients
+    
+    **Methods**
+    
+    * **eval_basis**
+        Evaluates the polynomials of the PCE basis on a given data set of 
+        input parameter realizations
+        
+    * **predict**
+        Evaluates the PCE on a given data set of input parameter realizations
     """
-
-    def __init__(self, method, verbose=False):
-        self.method = method
-        self.verbose = verbose
-        self.C = None
-        self.b = None
-
-    def fit(self, x, y):
+    def __init__(self, dist):
+        self.dist = dist
+        try:
+            self.n_inputs = len(dist.marginals)
+        except:
+            self.n_inputs = 1
+        self.n_outputs = None
+        self.midx_set = None 
+        self.n_polys = None 
+        self.coefficients = None
+        self.bias = None
+        self.poly_basis = None
+        self.design_matrix = None
+        self.exp_design_in = None
+        self.exp_design_out = None
+    
+    def eval_basis(self, sample_in):
         """
-        Fit the surrogate model using the training samples and the
-        corresponding model values. This method calls the 'run' method of the
-        input method class.
-
-        **Inputs:**
-
-        * **x** (`ndarray`):
-            `ndarray` containing the training points.
-
-        * **y** (`ndarray`):
-            `ndarray` containing the model evaluations at the training points.
-
-        **Output/Return:**
-
-        The ``fit`` method has no returns and it creates an `ndarray` with the
-        PCE coefficients.
+        Evaluate the polynomial basis given an input sample with dimensions 
+        (n_samples x n_inputs) which contains realizations of the input random 
+        parameters. The dimensions of the resulting matrix are 
+        (n_samples x n_polys).
+        
+        **Input**
+        
+        * **sample_in** (`ndarray`):
+            Data set upon which the basis polynomials will be evaluated
+            
+        **Output**
+            (n_samples x n_polys) matrix containing the evaluations of the PCE 
+            polynomials on the data set points
         """
+        
+        if self.n_inputs == 1:
+            n_samples = len(sample_in)
+        else:
+            try: # case: 2d array, n_samples x n_inputs
+                n_samples, n_inputs = np.shape(sample_in)
+            except: # case: 1d array, 1 x n_inputs
+                n_samples = 1
+                n_inputs = len(sample_in)
+                sample_in = sample_in.reshape(n_samples, n_inputs)
+            # check if dimensions agree
+            if n_inputs != self.n_inputs:
+                raise ValueError('Dimensions do not agree!')
+        
+        # construct polynomial basis if not available        
+        if self.poly_basis is None:
+            raise ValueError("PCE polynomial basis is empty!")
+        
+        # construct evaluation matrix
+        eval_matrix = np.empty([n_samples, self.n_polys])
+        for ii in range(self.n_polys):
+            eval_matrix[:, ii] = self.poly_basis[ii].evaluate(sample_in)
+        
+        return eval_matrix
 
-        if self.verbose:
-            print('UQpy: Running PCE.fit')
-
-        if type(self.method) == PolyChaosLstsq:
-            self.C = self.method.run(x, y)
-
-        elif type(self.method) == PolyChaosLasso or \
-                type(self.method) == PolyChaosRidge:
-            self.C, self.b = self.method.run(x, y)
-
-        if self.verbose:
-            print('UQpy: PCE fit complete.')
-
-    def predict(self, x_test):
-
+    
+    def predict(self, sample_in):
         """
-        Predict the model response at new points.
-        This method evaluates the PCE model at new sample points.
-
-        **Inputs:**
-
-        * **x_test** (`ndarray`):
-            Points at which to predict the model response.
-
-        **Outputs:**
-
-        * **y** (`ndarray`):
-            Predicted values at the new points.
-
+        PCE predictions for the input data sample.
+        
+        **Input**
+        
+        * **sample_in** (`ndarray`):
+            Data set upon which the PCE will be evaluated
+            
+        **Output**
+            (`1darray`) Vector containing the evaluations of the PCE on the  
+            data set points
         """
-
-        a = self.method.poly_object.evaluate(x_test)
-
-        if type(self.method) == PolyChaosLstsq:
-            y = a.dot(self.C)
-
-        elif type(self.method) == PolyChaosLasso or \
-                type(self.method) == PolyChaosRidge:
-            y = a.dot(self.C) + self.b
-
-        return y
+        D = self.eval_basis(sample_in)
+        if self.bias is None:
+            return D.dot(self.coefficients)
+        else:
+            return D.dot(self.coefficients) + self.bias
