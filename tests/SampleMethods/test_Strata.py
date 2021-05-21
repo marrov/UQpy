@@ -1,9 +1,12 @@
 from UQpy.SampleMethods import RectangularStrata, VoronoiStrata, DelaunayStrata
 import pytest
 import numpy as np
+import os
 
 strata = RectangularStrata(nstrata=[3, 3])
-strata1 = RectangularStrata(input_file='strata.txt')
+dir_path = os.path.dirname(os.path.realpath(__file__))
+filepath=os.path.join(dir_path,'strata.txt')
+strata1 = RectangularStrata(input_file=filepath)
 fig = strata1.plot_2d()
 
 strata_vor = VoronoiStrata(nseeds=8, dimension=2, random_state=3)

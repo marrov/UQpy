@@ -1,6 +1,7 @@
 from UQpy.SampleMethods import RectangularStrata, RectangularSTS, VoronoiStrata, VoronoiSTS, DelaunayStrata, DelaunaySTS
 from UQpy.Distributions import Exponential
 import numpy as np
+import os
 
 marginals = [Exponential(loc=1., scale=1.), Exponential(loc=1., scale=1.)]
 strata = RectangularStrata(nstrata=[3, 3])
@@ -10,7 +11,9 @@ x_sts = RectangularSTS(dist_object=marginals, strata_object=strata, nsamples_per
 x_sts1 = RectangularSTS(dist_object=marginals, strata_object=strata, nsamples_per_stratum=1,  sts_criterion="centered",
                         random_state=1)
 
-strata1 = RectangularStrata(input_file='strata.txt')
+dir_path = os.path.dirname(os.path.realpath(__file__))
+filepath=os.path.join(dir_path,'strata.txt')
+strata1 = RectangularStrata(input_file=filepath)
 x_sts2 = RectangularSTS(dist_object=marginals, strata_object=strata1, nsamples_per_stratum=1, random_state=1)
 
 strata_vor = VoronoiStrata(nseeds=8, dimension=2, random_state=3)
