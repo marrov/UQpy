@@ -37,6 +37,7 @@ from UQpy.SampleMethods.LHS import LHS
 from UQpy.SampleMethods.IS import IS
 from UQpy.SampleMethods.AKMCS import AKMCS
 from UQpy.SampleMethods.Simplex import Simplex
+from UQpy.SampleMethods.ParallelTempering import ParallelTemperingMCMC
 
 from UQpy.SampleMethods.RSS import *
 from UQpy.SampleMethods.STS import *
