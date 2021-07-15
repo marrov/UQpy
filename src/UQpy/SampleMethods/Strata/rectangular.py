@@ -128,7 +128,6 @@ class RectangularStrata(Strata):
 
     @staticmethod
     def fullfact(levels):
-
         """
         Create a full-factorial design
 
@@ -155,6 +154,7 @@ class RectangularStrata(Strata):
         * **ff** (`ndarray`):
             Full-factorial design matrix.
         """
+
         # Number of factors
         n_factors = len(levels)
         # Number of combinations
@@ -194,4 +194,3 @@ class RectangularStrata(Strata):
             ax.add_patch(rect1)
 
         return fig
-

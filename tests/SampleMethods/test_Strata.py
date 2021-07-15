@@ -2,15 +2,18 @@ from UQpy.SampleMethods import RectangularStrata, VoronoiStrata, DelaunayStrata
 import pytest
 import numpy as np
 
-strata = RectangularStrata(nstrata=[3, 3])
+strata = RectangularStrata(nstrata=[3, 3], verbose=True)
 strata1 = RectangularStrata(input_file='strata.txt')
 fig = strata1.plot_2d()
 
-strata_vor = VoronoiStrata(nseeds=8, dimension=2, random_state=3)
-strata_vor1 = VoronoiStrata(nseeds=8, dimension=2, niters=0, random_state=3)
+strata_vor = VoronoiStrata(nseeds=8, dimension=2, random_state=3, verbose=True)
+strata_vor1 = VoronoiStrata(nseeds=8, dimension=2, niters=0, random_state=3, verbose=True)
+seeds_ = np.array([[0, 0, 0], [0, 0, 1], [0, 1, 0], [0, 1, 1], [1, 0, 0], [1, 0, 1], [1, 1, 0], [1, 1, 1]])
+strata_vor2 = VoronoiStrata(seeds=seeds_, dimension=3, niters=0, random_state=3, verbose=True)
 
 seeds = np.array([[0, 0], [0.4, 0.8], [1, 0], [1, 1]])
-strata_del = DelaunayStrata(seeds=seeds)
+strata_del = DelaunayStrata(seeds=seeds, dimension=2, verbose=True)
+strata_del1 = DelaunayStrata(nseeds=4, dimension=2, random_state=10)
 
 
 # Unit tests
@@ -44,20 +47,32 @@ def test_3():
     """
         Test error check.
     """
+    with pytest.raises(TypeError):
+        RectangularStrata(random_state='ab')
+
+
+def test_rectangular_no_attributes():
+    """
+        No attribute is assigned to define the strata.
+    """
     with pytest.raises(RuntimeError):
         RectangularStrata()
 
 
-def test_4():
+def test_not_space_filling():
     """
-        Test error check.
+        No attribute is assigned to define the strata.
     """
-    tmp = False
-    try:
-        RectangularStrata(random_state='ab')
-    except TypeError:
-        tmp = True
-    assert tmp
+    with pytest.raises(RuntimeError):
+        RectangularStrata(input_file='strata1.txt')
+
+
+def test_over_filling():
+    """
+        No attribute is assigned to define the strata.
+    """
+    with pytest.raises(RuntimeError):
+        RectangularStrata(input_file='strata2.txt')
 
 
 def test_5():
@@ -72,6 +87,13 @@ def test_5():
 
 
 def test_6():
+    """
+    Test output attributes of strata_vor2 object.
+    """
+    assert (np.round(strata_vor2.volume, 2) == np.array([1., 1., 1., 1., 1., 1., 1., 1.])).all()
+
+
+def test_voronoi_volume3():
     """
     Test output attributes of strata_vor1 object.
     """
