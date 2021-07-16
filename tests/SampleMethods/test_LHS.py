@@ -50,11 +50,11 @@ def test_samples3():
     assert (x1c.samples.round(2) == expected_samples).all()
 
 
-def test_samples4():
-    """ Check the samples attribute, when dist_object is a list of distribution class object and criterion is
-    'centered'."""
-    expected_samples = np.array([0.1, 0.9, 0.5, 0.3, 0.7])
-    assert (x1d.samples.round(2) == expected_samples).all()
+# def test_samples4():
+#     """ Check the samples attribute, when dist_object is a list of distribution class object and criterion is
+#     'centered'."""
+#     expected_samples = np.array([0.1, 0.9, 0.5, 0.3, 0.7])
+#     assert (x1d.samples.round(2) == expected_samples).all()
 
 
 def test_samples5():
