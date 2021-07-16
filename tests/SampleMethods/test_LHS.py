@@ -37,10 +37,10 @@ def test_samples1():
 
 
 
-def test_samples2():
-    """ Check the samples attribute, when dist_object is a jointInd class object and criterion is 'correlate'."""
-    expected_samples = np.array([[0.94, 0.54], [0.26, 0.08], [0.45, 0.88], [0.14, 0.7], [0.71, 0.4]])
-    assert (x1b.samples.round(2) == expected_samples).all()
+# def test_samples2():
+#     """ Check the samples attribute, when dist_object is a jointInd class object and criterion is 'correlate'."""
+#     expected_samples = np.array([[0.94, 0.54], [0.26, 0.08], [0.45, 0.88], [0.14, 0.7], [0.71, 0.4]])
+#     assert (x1b.samples.round(2) == expected_samples).all()
 
 
 def test_samples3():
@@ -50,11 +50,11 @@ def test_samples3():
     assert (x1c.samples.round(2) == expected_samples).all()
 
 
-# def test_samples4():
-#     """ Check the samples attribute, when dist_object is a list of distribution class object and criterion is
-#     'centered'."""
-#     expected_samples = np.array([0.1, 0.9, 0.5, 0.3, 0.7])
-#     assert (x1d.samples.round(2) == expected_samples).all()
+def test_samples4():
+    """ Check the samples attribute, when dist_object is a list of distribution class object and criterion is
+    'centered'."""
+    expected_samples = np.array([0.1, 0.9, 0.5, 0.3, 0.7])
+    assert (x1d.samples.round(2) == expected_samples).all()
 
 
 def test_samples5():
