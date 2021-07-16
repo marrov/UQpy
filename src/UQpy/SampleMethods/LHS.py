@@ -78,8 +78,10 @@ class LHS:
         self.kwargs = kwargs
 
         self.random_state = random_state
+        self.random_generator = np.random.default_rng()
         if isinstance(self.random_state, int):
-            self.random_state = np.random.RandomState(self.random_state)
+            # self.random_state = np.random.RandomState(self.random_state)
+            self.random_generator = np.random.default_rng(self.random_state)
         elif not isinstance(self.random_state, (type(None), np.random.RandomState)):
             raise TypeError('UQpy: random_state must be None, an int or an np.random.RandomState object.')
 
@@ -155,15 +157,15 @@ class LHS:
             samples[:, i] = u[:, i] * (b - a) + a
 
         if self.criterion == 'random' or self.criterion is None:
-            u_lhs = self.random(samples, random_state=self.random_state)
+            u_lhs = self.random(samples, random_generator=self.random_generator)
         elif self.criterion == 'centered':
-            u_lhs = self.centered(samples, random_state=self.random_state, a=a, b=b)
+            u_lhs = self.centered(samples, random_generator=self.random_generator, a=a, b=b)
         elif self.criterion == 'maximin':
-            u_lhs = self.max_min(samples, random_state=self.random_state, **self.kwargs)
+            u_lhs = self.max_min(samples, random_generator=self.random_generator, **self.kwargs)
         elif self.criterion == 'correlate':
-            u_lhs = self.correlate(samples, random_state=self.random_state, **self.kwargs)
+            u_lhs = self.correlate(samples, random_generator=self.random_generator, **self.kwargs)
         elif callable(self.criterion):
-            u_lhs = self.criterion(samples, random_state=self.random_state, **self.kwargs)
+            u_lhs = self.criterion(samples, random_generator=self.random_generator, **self.kwargs)
         else:
             raise ValueError('UQpy: A valid criterion is required.')
 
@@ -187,7 +189,7 @@ class LHS:
             print('Successful execution of LHS design.')
 
     @staticmethod
-    def random(samples, random_state=None):
+    def random(samples, random_generator=None):
         """
         Method for generating a Latin hypercube design by sampling randomly inside each bin.
 
@@ -211,15 +213,16 @@ class LHS:
         lhs_samples = np.zeros_like(samples)
         nsamples = len(samples)
         for j in range(samples.shape[1]):
-            if random_state is not None:
-                order = random_state.permutation(nsamples)
+            if random_generator is not None:
+                order = random_generator.permutation(nsamples)
             else:
+                random_generator = np.random.default_rng()
                 order = np.random.permutation(nsamples)
             lhs_samples[:, j] = samples[order, j]
 
         return lhs_samples
 
-    def max_min(self, samples, random_state=None, iterations=100, metric='euclidean'):
+    def max_min(self, samples, random_generator=None, iterations=100, metric='euclidean'):
         """
         Method for generating a Latin hypercube design that aims to maximize the minimum sample distance.
 
@@ -268,11 +271,11 @@ class LHS:
             raise ValueError("UQpy: Please provide a valid metric.")
 
         i = 0
-        lhs_samples = LHS.random(samples, random_state)
+        lhs_samples = LHS.random(samples, random_generator)
         d = d_func(lhs_samples)
         max_min_dist = np.min(d)
         while i < iterations:
-            samples_try = LHS.random(samples, random_state)
+            samples_try = LHS.random(samples, random_generator)
             d = d_func(samples_try)
             if max_min_dist < np.min(d):
                 max_min_dist = np.min(d)
@@ -284,7 +287,7 @@ class LHS:
 
         return lhs_samples
 
-    def correlate(self, samples, random_state=None, iterations=100):
+    def correlate(self, samples, random_generator=None, iterations=100):
         """
         Method for generating a Latin hypercube design that aims to minimize spurious correlations.
 
@@ -310,13 +313,13 @@ class LHS:
             raise ValueError('UQpy: number of iterations must be an integer.')
 
         i = 0
-        lhs_samples = LHS.random(samples, random_state)
+        lhs_samples = LHS.random(samples, random_generator)
         r = np.corrcoef(np.transpose(lhs_samples))
         np.fill_diagonal(r, 1)
         r1 = r[r != 1]
         min_corr = np.max(np.abs(r1))
         while i < iterations:
-            samples_try = LHS.random(samples, random_state)
+            samples_try = LHS.random(samples, random_generator)
             r = np.corrcoef(np.transpose(samples_try))
             np.fill_diagonal(r, 1)
             r1 = r[r != 1]
@@ -330,7 +333,7 @@ class LHS:
         return lhs_samples
 
     @staticmethod
-    def centered(samples, random_state=None, a=None, b=None):
+    def centered(samples, random_generator=None, a=None, b=None):
         """
         Method for generating a Latin hypercube design with samples centered in the bins.
 
@@ -357,9 +360,10 @@ class LHS:
         u_temp = (a + b) / 2
         lhs_samples = np.zeros([samples.shape[0], samples.shape[1]])
         for i in range(samples.shape[1]):
-            if random_state is not None:
-                lhs_samples[:, i] = random_state.permutation(u_temp)
+            if random_generator is not None:
+                lhs_samples[:, i] = random_generator.permutation(u_temp)
             else:
-                lhs_samples[:, i] = np.random.permutation(u_temp)
+                random_generator = np.random.default_rng()
+                lhs_samples[:, i] = random_generator.permutation(u_temp)
 
         return lhs_samples
