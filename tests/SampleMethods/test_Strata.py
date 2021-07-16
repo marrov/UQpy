@@ -3,9 +3,9 @@ import pytest
 import numpy as np
 import os
 
-strata = RectangularStrata(nstrata=[3, 3])
+strata = RectangularStrata(nstrata=[3, 3], verbose=True)
 dir_path = os.path.dirname(os.path.realpath(__file__))
-filepath = os.path.join(dir_path,'strata.txt')
+filepath = os.path.join(dir_path, 'strata.txt')
 strata1 = RectangularStrata(input_file=filepath)
 fig = strata1.plot_2d()
 
