@@ -14,8 +14,6 @@ x1b = LHS(dist_object=joint_dist, criterion='correlate', nsamples=5, random_stat
 
 x1c = LHS(dist_object=[dist1, dist2], nsamples=5, random_state=789, verbose=True)
 
-x1d = LHS(dist_object=dist1, criterion='centered', random_state=123, nsamples=5, verbose=True)
-
 x1e = LHS(dist_object=dist1, criterion='centered', nsamples=5, verbose=True)
 
 cut = np.linspace(0, 1, 5 + 1)
@@ -48,13 +46,6 @@ def test_samples3():
     'random'."""
     expected_samples = np.array([[1.00, 1.00], [0.56, 0.72], [0.25, 0.25], [0.72, 0.56], [0.06, 0.06]])
     assert (x1c.samples.round(2) == expected_samples).all()
-
-
-def test_samples4():
-    """ Check the samples attribute, when dist_object is a list of distribution class object and criterion is
-    'centered'."""
-    expected_samples = np.array([0.9, 0.1, 0.5, 0.7, 0.3])
-    assert (x1d.samples.round(2) == expected_samples).all()
 
 
 def test_samples5():
