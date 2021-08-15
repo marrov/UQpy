@@ -163,10 +163,12 @@ class DiffusionMaps:
         n_evecs = self.n_evecs
 
         # Find the eigenvalues and eigenvectors of ``transition_matrix``.
-        if self.sparse:
-            evals, evecs = spsl.eigs(self.transition_matrix, k=(n_evecs + 1), which='LR')
-        else:
-            evals, evecs = np.linalg.eig(self.transition_matrix)
+        evals, evecs = eigsolver(self.transition_matrix, (n_evecs + 1))
+
+        #if self.sparse:
+        #    evals, evecs = spsl.eigs(self.transition_matrix, k=(n_evecs + 1), which='LR')
+        #else:
+        #    evals, evecs = np.linalg.eig(self.transition_matrix)
 
         ix = np.argsort(np.abs(evals))
         ix = ix[::-1]
