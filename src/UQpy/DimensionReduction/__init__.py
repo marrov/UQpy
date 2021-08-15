@@ -34,7 +34,11 @@ The module currently contains the following classes:
 """
 
 from UQpy.DimensionReduction.DiffusionMaps import DiffusionMaps
+from UQpy.DimensionReduction.GrassmannianDiffusionMaps import GrassmannianDiffusionMaps
 from UQpy.DimensionReduction.Grassmann import Grassmann
+from UQpy.DimensionReduction.GrassmannOptimization import KarcherMean
+from UQpy.DimensionReduction.Kernels import Kernels
+from UQpy.DimensionReduction.Distances import Distances
 from UQpy.DimensionReduction.DirectPOD import DirectPOD
 from UQpy.DimensionReduction.SnapshotPOD import SnapshotPOD
 from UQpy.DimensionReduction.HOSVD import HOSVD
