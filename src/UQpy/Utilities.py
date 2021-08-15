@@ -355,49 +355,6 @@ def _get_pu(a, w=None):
     return np.matrix(a_ret)
 
 
-def _nn_coord(x, k):
-    
-    """
-    Select k elements close to x.
-
-    Select k elements close to x to be used to construct a sparse kernel
-    matrix to be used in the diffusion maps.
-
-    **Input:**
-
-    :param x: Matrices to be tested.
-    :type  x: list or numpy array
-    
-    :param k: Number of points close to x.
-    :type  k: int
-
-    **Output/Returns:**
-
-    :return idx: Indices of the closer points.
-    :rtype  idx: int
-    """
-        
-    if isinstance(x, list):
-        x = np.array(x)
-        
-    dim = np.shape(x)
-    
-    if len(dim) is not 1:
-        raise ValueError('k MUST be a vector.')
-    
-    if not isinstance(k, int):
-        raise TypeError('k MUST be integer.')
-
-    if k < 1:
-        raise ValueError('k MUST be larger than or equal to 1.')
-    
-    # idx = x.argsort()[::-1][:k]
-    idx = x.argsort()[:len(x)-k]
-    # idx = idx[0:k]
-    # idx = idx[k+1:]
-    return idx
-
-
 def correlation_distortion(dist_object, rho):
     """
         This method computes the corelation distortion from Gaussian distribution to any other distribution defined in
@@ -443,3 +400,83 @@ def correlation_distortion(dist_object, rho):
     rho_non = np.sum(coef * phi2)
     rho_non = (rho_non - dist_object.moments(moments2return='m') ** 2) / dist_object.moments(moments2return='v')
     return rho_non
+
+
+def _nn_coord(x, k):
+    
+    """
+    Select k elements close to x.
+
+    Select k elements close to x to be used to construct a sparse kernel
+    matrix to be used in the diffusion maps.
+
+    **Input:**
+
+    :param x: Matrices to be tested.
+    :type  x: list or numpy array
+    
+    :param k: Number of points close to x.
+    :type  k: int
+
+    **Output/Returns:**
+
+    :return idx: Indices of the closer points.
+    :rtype  idx: int
+    """
+        
+    if isinstance(x, list):
+        x = np.array(x)
+        
+    dim = np.shape(x)
+    
+    if len(dim) is not 1:
+        raise ValueError('k MUST be a vector.')
+    
+    if not isinstance(k, int):
+        raise TypeError('k MUST be integer.')
+
+    if k < 1:
+        raise ValueError('k MUST be larger than or equal to 1.')
+    
+    # idx = x.argsort()[::-1][:k]
+    idx = x.argsort()[:len(x)-k]
+    # idx = idx[0:k]
+    # idx = idx[k+1:]
+    return idx
+
+
+def eigsolver(kernel_matrix, npairs):
+    n, m = np.shape(kernel_matrix)
+
+    if npairs > m:
+        npairs = m
+
+    is_symmetric = np.allclose(kernel_matrix, np.asmatrix(kernel_matrix).H)
+
+    if npairs == m:
+        if is_symmetric:
+            scipy_eigvec_solver = sp.linalg.eigh
+        else:
+            scipy_eigvec_solver = sp.linalg.eig
+
+        solver_kwargs = {"check_finite": False}
+
+    else:  # n_eigenpairs < matrix.shape[1]
+        if is_symmetric:
+            scipy_eigvec_solver = sp.sparse.linalg.eigsh
+        else:
+            scipy_eigvec_solver = sp.sparse.linalg.eigs
+
+        solver_kwargs = {
+            "k": npairs,
+            "which": "LM",
+            "v0": np.ones(n),
+            "tol": 1e-14,
+            "sigma": None
+        }
+
+    evals, evec = scipy_eigvec_solver(kernel_matrix, **solver_kwargs)
+    evec /= np.linalg.norm(evec, axis=0)[np.newaxis, :]
+
+    return evals, evec
+
