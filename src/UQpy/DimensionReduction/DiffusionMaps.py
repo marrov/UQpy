@@ -1,78 +1,55 @@
-import copy
-import itertools
-
-import numpy as np
-from sklearn.preprocessing import normalize
 from UQpy.Utilities import *
-import functools
-from UQpy.DimensionReduction.Grassmann import Grassmann
-
 import scipy.sparse as sps
 import scipy.sparse.linalg as spsl
 import scipy.spatial.distance as sd
-from scipy.interpolate import LinearNDInterpolator
 from UQpy.Utilities import _nn_coord
-from UQpy.Surrogates.Kriging import Kriging
+from UQpy.DimensionReduction.Kernels import Gaussian
 
-########################################################################################################################
-########################################################################################################################
-#                                            Diffusion Maps                                                            #
-########################################################################################################################
-########################################################################################################################
 
 class DiffusionMaps:
     """
-    Perform the diffusion maps on the input data to reveal its lower dimensional embedded geometry.
+    Diffusion Maps is a Subclass of Similarity.
 
-    In this class, the diffusion maps create a connection between the spectral properties of the diffusion process and
-    the intrinsic geometry of the data resulting in a multiscale representation of it. In this regard, an affinity
-    matrix containing the degree of similarity of the data points is either estimated based on the euclidean distance,
-    using a Gaussian kernel, or it is computed using any other Kernel definition passed to the main
-    method (e.g., defining a kernel on the Grassmann manifold).
+    Diffusion maps create a connection between the spectral properties of a diffusion process and the intrinsic geometry
+    of datasets. An affinity matrix containing the degree of similarity of data points is either estimated based on the
+    euclidean distance, using a Gaussian kernel, or it is computed using any other Kernel definition.
 
     **Input:**
 
     * **alpha** (`float`)
-        Assumes a value between 0 and 1 and corresponding to different diffusion operators. In this regard, one can use
-        this parameter to take into consideration the distribution of the data points on the diffusion process.
-        It happens because the distribution of the data is not necessarily dependent on the geometry of the manifold.
-        Therefore, if alpha` is equal to 1, the Laplace-Beltrami operator is approximated and the geometry of the
-        manifold is recovered without taking the distribution of the points into consideration. On the other hand, when
-        `alpha` is equal to 0.5 the Fokker-Plank operator is approximated and the distribution of points is taken into
-        consideration. Further, when `alpha` is equal to zero the Laplace normalization is recovered.
+        Assumes a value between 0 and 1 and corresponding to different diffusion operators.
 
     * **n_evecs** (`int`)
-        The number of eigenvectors and eigenvalues used in the representation of the diffusion coordinates.
+        The number of eigenvectors and eigenvalues for the eigendecomposition of the transition matrix.
 
     * **sparse** (`bool`)
-        Is a boolean variable to activate the `sparse` mode of the method.
+        Is a boolean variable to activate the `sparse` mode for the transition matrix.
 
     * **k_neighbors** (`int`)
         Used when `sparse` is True to select the k samples close to a given sample in the construction
-        of an sparse graph defining the affinity of the input data. For instance, if `k_neighbors` is equal to 10, only
-        the closest ten points of a given point are connect to a given point in the graph. As a consequence, the
-        obtained affinity matrix is sparse which reduces the computational effort of the eigendecomposition of the
-        transition kernel of the Markov chain.
+        of an sparse graph.
         
     * **kernel_object** (`function`)
-        An object of a callable object used to compute the kernel matrix. Three different options are provided:
+        A callable object used to compute the kernel matrix. Two different options are provided if no object of
+        ``Grassmann`` is provided in ``fit``:
 
-        - Using the ``DiffusionMaps`` method ``gaussian_kernel`` as
-          DiffusionMaps(kernel_object=DiffusionMaps.gaussian_kernel);
-        - Using an user defined function as DiffusionMaps(kernel_object=user_kernel);
-        - Passing a ``Grassmann`` class object DiffusionMaps(kernel_object=Grassmann_Object). In this case, the user has
-          to select ``kernel_grassmann`` in order to define which kernel matrix will be used because when the the
-          ``Grassmann`` class is used in a dataset a kernel matrix can be constructed with both the left and right
-          singular eigenvectors.
+        - kernel_object=Similarity.gaussian_kernel;
+        - Using an user defined function as kernel_object=user_kernel;
 
-    * **kernel_grassmann** (`str`)
-        It assumes the values 'left' and 'right' for the left and right singular eigenvectors used to compute the kernel
-        matrix, respectively. Moreover, if 'sum' is selected, it means that the kernel matrix is composed by the sum of
-        the kernel matrices estimated using the left and right singular eigenvectors. On the other hand, if 'prod' is used
-        instead, it means that the kernel matrix is composed by the product of the matrices estimated using the left and
-        right singular eigenvectors.
-    
-    **Attributes:** 
+    **Attributes:**
+
+    * **alpha** (`float`)
+        Assumes a value between 0 and 1 and corresponding to different diffusion operators.
+
+    * **n_evecs** (`int`)
+        The number of eigenvectors and eigenvalues for the eigendecomposition of the transition matrix.
+
+    * **sparse** (`bool`)
+        Is a boolean variable to activate the `sparse` mode for the transition matrix.
+
+    * **k_neighbors** (`int`)
+        Used when `sparse` is True to select the k samples close to a given sample in the construction
+        of an sparse graph.
     
     * **kernel_matrix** (`ndarray`)
         Kernel matrix.
@@ -93,24 +70,21 @@ class DiffusionMaps:
 
     """
 
-    def __init__(self, alpha=0.5, n_evecs=2, sparse=False, k_neighbors=1, kernel_object=None, kernel_grassmann=None):
+    def __init__(self, alpha=0.5, n_evecs=2, sparse=False, k_neighbors=1, kernel_object=Gaussian()):
 
+        self.kernel_object = kernel_object
         self.alpha = alpha
         self.n_evecs = n_evecs
         self.sparse = sparse
         self.k_neighbors = k_neighbors
-        self.kernel_object = kernel_object
-        self.kernel_grassmann = kernel_grassmann
+        self.kernel_matrix = None
+        self.transition_matrix = None
+        self.X = None
+        self.dcoords = None
+        self.evecs = None
+        self.evals = None
 
-        # from UQpy.DimensionReduction import Grassmann
-        # from DimensionReduction import Grassmann
-
-        if kernel_object is not None:
-            if callable(kernel_object) or isinstance(kernel_object, Grassmann):
-                self.kernel_object = kernel_object
-            else:
-                raise TypeError('UQpy: Either a callable kernel or a Grassmann class object must be provided.')
-
+        # Initial checks.
         if alpha < 0 or alpha > 1:
             raise ValueError('UQpy: `alpha` must be a value between 0 and 1.')
 
@@ -129,286 +103,279 @@ class DiffusionMaps:
             else:
                 raise TypeError('UQpy: `k_neighbors` must be integer.')
 
-    def mapping(self, data=None, epsilon=None):
+    def fit(self, X=None, kernel_matrix=None, **kwargs):
 
         """
-        Perform diffusion maps to reveal the embedded geometry of datasets.
+        Compute the diffusion coordinates.
 
-        In this method, the users have the option to work with input data defined by subspaces obtained via projection
-        of input data points on the Grassmann manifold, or directly with the input data points. For example,
-        considering that a ``Grassmann`` object is provided using the following command:
-
-        one can instantiate the DiffusionMaps class and run the diffusion maps as follows:
-
-        On the other hand, if the user wish to pass a dataset (samples) to compute the diffusion coordinates using the Gaussian
-        kernel, one can use the following commands:
-
-        In the latest case, if `epsilon` is not provided it is estimated based on the median of the square of the
-        euclidian distances between data points.
+        In this method, `X` is a list of data points (or matrices/tensors). The user can provide the `kernel_matrix`
+        instead of `X`. If the user wants to use the Gaussian kernel, `epsilon` can be
+        provided using keyword arguments, otherwise it is computed from the median of the pairwise distances.
 
         **Input:**
 
-        * **data** (`list`)
+        * **X** (`list`)
             Data points in the ambient space.
-        
-        * **epsilon** (`floar`)
-            Parameter of the Gaussian kernel.
 
-        **Output/Returns:**
-
-        * **dcoords** (`ndarray`)
-            Diffusion coordinates.
-
-        * **evals** (`ndarray`)
-            eigenvalues.
-
-        * **evecs** (`ndarray`)
-            eigenvectors.
-
-        """
-
-        alpha = self.alpha
-        n_evecs = self.n_evecs
-        sparse = self.sparse
-        k_neighbors = self.k_neighbors
-
-        if data is None and not isinstance(self.kernel_object, Grassmann):
-            raise TypeError('UQpy: Data cannot be NoneType.')
-
-        if isinstance(self.kernel_object, Grassmann):
-
-            if self.kernel_grassmann is None:
-                raise ValueError('UQpy: kernel_grassmann is not provided.')
-
-            if self.kernel_grassmann == 'left':
-                kernel_matrix = self.kernel_object.kernel(self.kernel_object.psi)
-            elif self.kernel_grassmann == 'right':
-                kernel_matrix = self.kernel_object.kernel(self.kernel_object.phi)
-            elif self.kernel_grassmann == 'sum':
-                kernel_psi, kernel_phi = self.kernel_object.kernel()
-                kernel_matrix = kernel_psi + kernel_phi
-            elif self.kernel_grassmann == 'prod':
-                kernel_psi, kernel_phi = self.kernel_object.kernel()
-                kernel_matrix = kernel_psi * kernel_phi
-            else:
-                raise ValueError('UQpy: the provided kernel_grassmann is not valid.')
-
-        elif self.kernel_object == DiffusionMaps.gaussian_kernel:
-            kernel_matrix = self.kernel_object(self, data=data, epsilon=epsilon)
-        elif callable(self.kernel_object) and self.kernel_object != DiffusionMaps.gaussian_kernel:
-            kernel_matrix = self.kernel_object(data=data)
-        else:
-            raise TypeError('UQpy: Not valid type for kernel_object')
-
-        n = np.shape(kernel_matrix)[0]
-        if sparse:
-            kernel_matrix = self.__sparse_kernel(kernel_matrix, k_neighbors)
-
-        # Compute the diagonal matrix D(i,i) = sum(Kernel(i,j)^alpha,j) and its inverse.
-        d, d_inv = self.__d_matrix(kernel_matrix, alpha)
-
-        # Compute L^alpha = D^(-alpha)*L*D^(-alpha).
-        l_star = self.__l_alpha_normalize(kernel_matrix, d_inv)
-
-        d_star, d_star_inv = self.__d_matrix(l_star, 1.0)
-        if sparse:
-            d_star_invd = sps.spdiags(d_star_inv, 0, d_star_inv.shape[0], d_star_inv.shape[0])
-        else:
-            d_star_invd = np.diag(d_star_inv)
-
-        transition_matrix = d_star_invd.dot(l_star)
-
-        # Find the eigenvalues and eigenvectors of Ps.
-        if sparse:
-            evals, evecs = spsl.eigs(transition_matrix, k=(n_evecs + 1), which='LR')
-        else:
-            evals, evecs = np.linalg.eig(transition_matrix)
-
-        ix = np.argsort(np.abs(evals))
-        ix = ix[::-1]
-        s = np.real(evals[ix])
-        u = np.real(evecs[:, ix])
-
-        # Truncated eigenvalues and eigenvectors
-        evals = s[:n_evecs]
-        evecs = u[:, :n_evecs]
-
-        # Compute the diffusion coordinates
-        dcoords = np.zeros([n, n_evecs])
-        for i in range(n_evecs):
-            dcoords[:, i] = evals[i] * evecs[:, i]
-
-        self.kernel_matrix = kernel_matrix
-        self.transition_matrix = transition_matrix
-        self.dcoords = dcoords
-        self.evecs = evecs
-        self.evals = evals
-
-        return dcoords, evals, evecs
-
-    def gaussian_kernel(self, data, epsilon=None):
-
-        """
-        Compute the Gaussian Kernel matrix.
-
-        Estimate the affinity matrix using the Gaussian kernel. If no `epsilon` is provided the method estimates a
-        suitable value taking the median of the square value of the pairwise euclidean distances of the points in the
-        input dataset.
-
-        **Input:**
-
-        * **data** (`list`)
-            Input data.
+        * **kernel_matrix** (`float`)
+            Kernel matrix computed by the user.
 
         * **epsilon** (`float`)
             Parameter of the Gaussian kernel.
 
         **Output/Returns:**
 
-        * **Kernel matrix** (`ndarray`)
-            Kernel matrix.
-
         """
 
-        sparse = self.sparse
-        k_neighbors = self.k_neighbors
+        # Checks!
+        if X is None and kernel_matrix is None:
+            raise TypeError('UQpy: either X or kernel_matrix must be provided.')
 
-        # Compute the pairwise distances.
-        if len(np.shape(data)) == 2:
-            # Set of 1-D arrays
-            distance_pairs = sd.pdist(data, 'euclidean')
-        elif len(np.shape(data)) == 3:
-            # Set of 2-D arrays
-            # Check arguments: verify the consistency of input arguments.
-            nargs = len(data)
-            indices = range(nargs)
-            pairs = list(itertools.combinations(indices, 2))
+        if X is not None and kernel_matrix is not None:
+            raise TypeError('UQpy: please, provide either X or kernel_matrix.')
 
-            distance_pairs = []
-            for id_pair in range(np.shape(pairs)[0]):
-                ii = pairs[id_pair][0]  # Point i
-                jj = pairs[id_pair][1]  # Point j
+        # Construct Kernel Matrix
+        if X is not None:
+            self.X = X
+            if not isinstance(X, list):
+                raise TypeError('UQpy: X must be a list.')
 
-                x0 = data[ii]
-                x1 = data[jj]
+            self.get_kernel_matrix(**kwargs)
+        elif kernel_matrix is not None:
+            self.kernel_matrix = kernel_matrix
 
-                distance = np.linalg.norm(x0 - x1, 'fro')
+        # Estimate the sparse kernel matrix if ``sparse`` is True.
+        if self.sparse:
+            self.sparse_kernel()
 
-                distance_pairs.append(distance)
+        # Compute transition matrix
+        self.get_transition_matrix()
+
+        # Get the diffusion maps.
+        self.get_dmaps()
+
+    def get_dmaps(self):
+
+        n = np.shape(self.kernel_matrix)[0]
+        if self.n_evecs is None:
+            self.n_evecs = n
+
+        n_evecs = self.n_evecs
+
+        # Find the eigenvalues and eigenvectors of ``transition_matrix``.
+        if self.sparse:
+            evals, evecs = spsl.eigs(self.transition_matrix, k=(n_evecs + 1), which='LR')
         else:
-            raise TypeError('UQpy: The size of the input data is not consistent with this method.')
+            evals, evecs = np.linalg.eig(self.transition_matrix)
 
-        if epsilon is None:
-            # Compute a suitable episilon when it is not provided by the user.
-            # Compute epsilon as the median of the square of the euclidean distances
-            epsilon = np.median(np.array(distance_pairs) ** 2)
+        ix = np.argsort(np.abs(evals))
+        ix = ix[::-1]
+        s = np.real(evals[ix])
+        u = np.real(evecs[:, ix])
 
-        kernel_matrix = np.exp(-sd.squareform(distance_pairs) ** 2 / (4 * epsilon))
+        # Truncated eigenvalues and eigenvectors.
+        evals = s[:n_evecs]
+        evecs = u[:, :n_evecs]
 
-        return kernel_matrix
+        # Compute the diffusion coordinates.
+        dcoords = np.zeros([n, n_evecs])
+        for i in range(n_evecs):
+            dcoords[:, i] = evals[i] * evecs[:, i]
 
-    # Private method
-    @staticmethod
-    def __sparse_kernel(kernel_matrix, k_neighbors):
+        # self.transition_matrix = transition_matrix
+        self.dcoords = dcoords
+        self.evecs = evecs
+        self.evals = evals
 
-        """
-        Private method: Construct a sparse kernel.
+    def get_kernel_matrix(self, **kwargs):
 
-        Given the number the k nearest neighbors and a kernel matrix, return a sparse kernel matrix.
+        num_X = len(self.X)
+        if num_X < 2:
+            raise ValueError('UQpy: At least two data points must be provided.')
 
-        **Input:**
+        # Compute the kernel matrix using the Gaussiann kernel.
+        self.kernel_object.fit(X=self.X, **kwargs)
+        self.kernel_matrix = self.kernel_object.kernel_matrix
 
-        * **kernel_matrix** (`list` or `ndarray`)
-            Kernel matrix.
-            
-        * **alpha** (`float`)
-            Assumes a value between 0 and 1 and corresponding to different diffusion operators.
-            
-        **Output/Returns:**
+    def get_transition_matrix(self):
 
-        * **D** (`list`)
-            Matrix D.
+        if self.kernel_matrix is None:
+            raise TypeError('UQpy: kernel_matrix not found!')
 
-        * **D_inv** (`list`)
-            Inverse of matrix D.
-
-        """
-
-        nrows = np.shape(kernel_matrix)[0]
-        for i in range(nrows):
-            vec = kernel_matrix[i, :]
-            idx = _nn_coord(vec, k_neighbors)
-            kernel_matrix[i, idx] = 0
-            if sum(kernel_matrix[i, :]) <= 0:
-                raise ValueError('UQpy: Consider increasing `k_neighbors` to have a connected graph.')
-
-        sparse_kernel_matrix = sps.csc_matrix(kernel_matrix)
-
-        return sparse_kernel_matrix
-
-    # Private method
-    @staticmethod
-    def __d_matrix(kernel_matrix, alpha):
-
-        """
-        Private method: Compute the diagonal matrix D and its inverse.
-
-        In the normalization process we have to estimate matrix D(i,i) = sum(Kernel(i,j)^alpha,j) and its inverse.
-
-        **Input:**
-
-        * **kernel_matrix** (`list` or `ndarray`)
-            Kernel matrix.
-            
-        * **alpha** (`float`)
-            Assumes a value between 0 and 1 and corresponding to different diffusion operators.
-            
-        **Output/Returns:**
-
-        * **d** (`list`)
-            Matrix D.
-
-        * **d_inv** (`list`)
-            Inverse of matrix D.
-
-        """
-
-        d = np.array(kernel_matrix.sum(axis=1)).flatten()
+        alpha = self.alpha
+        # Compute the diagonal matrix D(i,i) = sum(Kernel(i,j)^alpha,j) and its inverse.
+        # d, d_inv = self._d_matrix(self.kernel_matrix, self.alpha)
+        d = np.array(self.kernel_matrix.sum(axis=1)).flatten()
         d_inv = np.power(d, -alpha)
 
-        return d, d_inv
-
-    # Private method
-    def __l_alpha_normalize(self, kernel_mat, d_inv):
-
-        """
-        Private method: Compute and normalize the kernel matrix with the matrix D.
-
-        In the normalization process we have to estimate matrix D(i,i) = sum(Kernel(i,j)^alpha,j) and its inverse.
-        We now use this information to normalize the kernel matrix.
-
-        **Input:**
-
-        * **kernel_mat** (`list` or `ndarray`)
-            Kernel matrix.
-
-        * **d_inv** (`list` or `ndarray`)
-            Inverse of matrix D.
-
-        **Output/Returns:**
-
-        * **normalized_kernel** (`list` or `ndarray`)
-            Normalized kernel.
-
-        """
-
-        sparse = self.sparse
+        # Compute L^alpha = D^(-alpha)*L*D^(-alpha).
+        # l_star = self._l_alpha_normalize(self.kernel_matrix, d_inv)
         m = d_inv.shape[0]
-        if sparse:
+        if self.sparse:
             d_alpha = sps.spdiags(d_inv, 0, m, m)
         else:
             d_alpha = np.diag(d_inv)
 
-        normalized_kernel = d_alpha.dot(kernel_mat.dot(d_alpha))
+        l_star = d_alpha.dot(self.kernel_matrix.dot(d_alpha))
 
-        return normalized_kernel
+        # d_star, d_star_inv = self._d_matrix(l_star, 1.0)
+        d_star = np.array(l_star.sum(axis=1)).flatten()
+        d_star_inv = np.power(d_star, -1)
+
+        if self.sparse:
+            d_star_invd = sps.spdiags(d_star_inv, 0, d_star_inv.shape[0], d_star_inv.shape[0])
+        else:
+            d_star_invd = np.diag(d_star_inv)
+
+        # Compute the transition matrix.
+        self.transition_matrix = d_star_invd.dot(l_star)
+
+    # Private method
+    def sparse_kernel(self):
+
+        """
+        Private method: Construct a sparse kernel.
+
+        Given the k-nearest neighbors and a kernel matrix, return a sparse kernel matrix.
+
+        **Input:**
+
+        * **kernel_matrix** (`ndarray`)
+            Kernel matrix.
+
+        * **k_neighbors** (`float`)
+            k-neighbors number used in the construction of the sparse matrix.
+
+        **Output/Returns:**
+
+        * **sparse_kernel_matrix** (`ndarray`)
+            Sparse kernel matrix.
+
+        """
+        kernel_matrix = self.kernel_matrix
+        nrows = np.shape(kernel_matrix)[0]
+        for i in range(nrows):
+            vec = kernel_matrix[i, :]
+            idx = _nn_coord(vec, self.k_neighbors)
+            kernel_matrix[i, idx] = 0
+            if sum(kernel_matrix[i, :]) <= 0:
+                raise ValueError('UQpy: Consider increasing `k_neighbors` to have a connected graph.')
+
+        self.kernel_matrix = sparse_kernel_matrix = sps.csc_matrix(kernel_matrix)
+
+    def parsimonious(self, num_eigenvectors=None):
+        """
+        This method implements an algorithm to identify the unique eigendirections.
+
+        **Input:**
+
+        * **num_eigenvectors** (`int`):
+            An integer for the number of eigenvectors to be tested.
+
+        * **visualization** (`Boolean`):
+            Plot a grafic showing the eigenvalues and the corresponding ratios.
+
+        **Output/Returns:**
+        * **index** (`ndarray`):
+            The indexes of eigenvectors.
+
+        * **residuals** (`ndarray`):
+            Residuals used to identify the most parsimonious low-dimensional representation.
+
+        """
+
+        evecs = self.evecs
+        n_evecs = self.n_evecs
+
+        if num_eigenvectors is None:
+            num_eigenvectors = n_evecs
+        elif num_eigenvectors > n_evecs:
+            raise ValueError('UQpy: num_eigenvectors cannot be larger than n_evecs.')
+
+        eigvec = np.asarray(evecs)
+        eigvec = eigvec[:, 0:num_eigenvectors]
+
+        residuals = np.zeros(num_eigenvectors)
+        residuals[0] = np.nan
+
+        # residual 1 for the first eigenvector.
+        residuals[1] = 1.0
+
+        # Get the residuals of each eigenvector.
+        for i in range(2, num_eigenvectors):
+            residuals[i] = self._get_residual(fmat=eigvec[:, 1:i], f=eigvec[:, i])
+
+        # Get the index of the eigenvalues associated with each residual.
+        index = np.argsort(residuals)[::-1][:len(self.evals)]
+
+        return index, residuals
+
+    # Private method.
+    @staticmethod
+    def _get_residual(fmat, f):
+
+        """
+        Get the residuals of each eigenvector.
+
+        **Input:**
+        * **fmat** (`ndarray`):
+            Matrix with eigenvectors for the linear system.
+
+        * **f** (`ndarray`):
+            Eigenvector in the right-hand side of the linear system.
+
+        **Output/Returns:**
+        * **residuals** (`ndarray`):
+            Residuals used to identify the most parsimonious low-dimensional representation
+            for a given combination of eigenvectors.
+
+        """
+
+        # Number of samples.
+        nsamples = np.shape(fmat)[0]
+
+        # Distance matrix to compute the Gaussian kernel.
+        distance_matrix = sd.squareform(sd.pdist(fmat))
+
+        # m=3 is suggested by Nadler et al. 2008.
+        m = 3
+
+        # Compute an appropriate value for epsilon.
+        # epsilon = np.median(abs(np.square(distance_matrix.flatten())))/m
+        epsilon = (np.median(distance_matrix.flatten()) / m) ** 2
+
+        # Gaussian kernel. It is implemented here because of the factor m and the
+        # shape of the argument of the exponential is the one suggested by Nadler et al. 2008.
+        kernel_matrix = np.exp(-np.square(distance_matrix) / epsilon)
+
+        # Matrix to store the coefficients from the linear system.
+        coeffs = np.zeros((nsamples, nsamples))
+
+        vec_1 = np.ones((nsamples, 1))
+
+        for i in range(nsamples):
+            # Weighted least squares:
+
+            # Stack arrays in sequence horizontally.
+            #        [1| x x x ... x]
+            #        [      ...     ]
+            # matx = [1| 0 0 0 ... 0]
+            #        [      ...     ]
+            #        [1| x x x ... x]
+            matx = np.hstack([vec_1, fmat - fmat[i, :]])
+
+            # matx.T*Kernel
+            matx_k = matx.T * kernel_matrix[i, :]
+
+            # matx.T*Kernel*matx
+            wdata = matx_k.dot(matx)
+            u, _, _, _ = np.linalg.lstsq(wdata, matx_k, rcond=1e-6)
+
+            coeffs[i, :] = u[0, :]
+
+        estimated_f = coeffs.dot(f)
+
+        # normalized leave-one-out cross-validation error.
+        residual = np.sqrt(np.sum(np.square((f - estimated_f))) / np.sum(np.square(f)))
+
+        return residual
