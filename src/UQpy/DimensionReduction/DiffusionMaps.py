@@ -264,6 +264,30 @@ class DiffusionMaps:
                 raise ValueError('UQpy: Consider increasing `k_neighbors` to have a connected graph.')
 
         self.kernel_matrix = sparse_kernel_matrix = sps.csc_matrix(kernel_matrix)
+        
+    def diffusion_distance(self, y=None):
+        """
+        This method is used to compute the diffusion distance. It uses the methods from Distances, 
+        in particular the Euclidean distance.
+        
+        **Input:**
+        
+        * **y** (`list`, `ndarray`):
+            A `list` or `ndarray` for calculation of a partial distance matrix (optional).
+            
+        **Output/Returns**
+        
+        * **diffusion_distance_matrix** (`ndarray`):
+            The distance matrix.
+            
+        """
+
+        dcoords = self.dcoords
+        distance_object = Distances()
+        distance_object.fit(X=dcoords, y=y)
+        diffusion_distance_matrix = distance_object.distance_matrix
+
+        return diffusion_distance_matrix
 
     def parsimonious(self, num_eigenvectors=None):
         """
