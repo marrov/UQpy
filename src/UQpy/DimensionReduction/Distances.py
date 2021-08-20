@@ -135,9 +135,9 @@ class Distances:
 
         """
 
-        d = np.linalg.norm(x0 - x1)
+        raise NotImplementedError('UQpy: no kernel is implemented here.')
 
-        return d
+        pass
 
 
 class Euclidean(Distances):
@@ -362,7 +362,7 @@ class Asimov(Distances):
         return d
 
 
-class BinetCauchy(Distances):
+class BinetCauchyDistance(Distances):
 
     @staticmethod
     def distance(x0, x1, **kwargs):
@@ -521,7 +521,7 @@ class Martin(Distances):
         return d
 
 
-class Projection(Distances):
+class ProjectionDistance(Distances):
 
     @staticmethod
     def distance(x0, x1, **kwargs):
