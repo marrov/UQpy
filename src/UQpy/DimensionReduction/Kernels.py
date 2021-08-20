@@ -112,22 +112,6 @@ class Kernels:
 
         self.kernel_matrix = kernel_matrix
 
-        #if self.kernel_object is not None:
-        #
-        #    if self.kernel_object == self.gaussian_kernel:
-        #
-        #        distance = self._get_kernel(X=X, y=y, sim_fun=self.euclidean)
-        #        if epsilon is None:
-        #            # This is a rule of thumb.
-        #            epsilon = np.median(distance) ** 2
-        #
-        #        self.kernel_matrix = np.exp(-np.square(distance) / (4 * epsilon))
-        #        self.epsilon = epsilon
-        #    else:
-        #        sim_fun = self.kernel_object
-        #        self.kernel_matrix = self._get_kernel(X=X, y=y, sim_fun=sim_fun)
-
-
     # Default Kernel.
     @staticmethod
     def kernel(x0, x1, **kwargs):
@@ -149,23 +133,8 @@ class Kernels:
             Kernel value for x0 and x1.
 
         """
-        if 'epsilon' in kwargs.keys():
-            epsilon = kwargs['epsilon']
-        else:
-            raise ValueError('UQpy: epsilon not provided.')
-
-        if epsilon is None:
-            raise TypeError('UQpy: epsilon cannot be NoneType.')
-
-        if not isinstance(epsilon, float) and not isinstance(epsilon, int):
-            raise TypeError('UQpy: x0 must be either float or int.')
-
-        if epsilon < 0:
-            raise ValueError('UQpy: epsilon must be larger than 0.')
-
-        ker = np.exp(-(np.linalg.norm(x0 - x1) ** 2) / (4 * epsilon))
-
-        return ker
+        raise NotImplementedError('UQpy: no kernel is implemented here.')
+        pass
 
 
 class Gaussian(Kernels):
@@ -209,7 +178,7 @@ class Gaussian(Kernels):
 
         return ker
 
-class Projection(Kernels):
+class ProjectionKernel(Kernels):
 
     @staticmethod
     def kernel(x0, x1, **kwargs):
@@ -248,7 +217,7 @@ class Projection(Kernels):
         return ker
 
 
-class BinetCauchy(Kernels):
+class BinetCauchyKernel(Kernels):
 
     @staticmethod
     def kernel(x0, x1, **kwargs):
