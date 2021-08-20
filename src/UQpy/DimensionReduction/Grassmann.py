@@ -1,5 +1,4 @@
-import copy
-from UQpy.Utilities import *
+from Utilities import *
 
 
 class Grassmann:
@@ -113,14 +112,11 @@ class Grassmann:
         self.psi = []
         self.sigma = []
         self.phi = []
-        self.n_psi = []
-        self.n_phi = []
         self.ranks = []
         self.num_X = 0
         self.max_rank = None
 
-    def fit(self, X=None, append=False):
-
+    def fit(self, X=None):
         """
         Set the grassmann manifold and project samples on it via singular value decomposition.
 
@@ -135,71 +131,35 @@ class Grassmann:
         * **X** (`list`)
             Input samples defined as a `list` of matrices.
 
-        * **append_X** (`bool`)
-            The attributes are replaced when manifold is called if `append_X` is False, otherwise the lists are
-            appended.
-
         """
 
         p = self.p
-        # If manifold called for the first time, force append_X to be False.
-        if not self.X:
-            append = False
-
         # Test X for type consistency.
         if not isinstance(X, list) and not isinstance(X, np.ndarray):
-            raise TypeError('UQpy: `samples` must be either a list or numpy.ndarray.')
+            raise TypeError('UQpy: `X` must be either a list or numpy.ndarray.')
         elif isinstance(X, np.ndarray):
             X = X.tolist()
 
-        # If append_X is true, store the new samples in a new list.
-        if append:
-            X_new = copy.copy(X)
-            nargs_new = len(X_new)
+        test_0 = all(X_.shape[0] == X[0].shape[0] for X_ in X)
+        test_1 = all(X_.shape[1] == X[0].shape[1] for X_ in X)
+        if not test_0:
+            raise ValueError('UQpy: elements in X must have the same dimension.')
 
-            for i in range(nargs_new):
-                self.X.append(X_new[i])
-
-            X = self.X
-            if p is None:
-                p = self.p
+        if not test_1:
+            raise ValueError('UQpy: elements in X must have the same dimension.')
 
         # Get the length of X.
         nargs = len(X)
 
         # At least one argument must be provided, otherwise show an error message.
         if nargs < 1:
-            raise ValueError('UQpy: At least one input matrix must be provided.')
-
-        n_left = []
-        n_right = []
-        for i in range(nargs):
-            n_left.append(max(np.shape(X[i])))
-            n_right.append(min(np.shape(X[i])))
-
-        bool_left = (n_left.count(n_left[0]) != len(n_left))
-        bool_right = (n_right.count(n_right[0]) != len(n_right))
-
-        if bool_left and bool_right:
-            raise TypeError('UQpy: The shape of the input matrices must be the same.')
-        else:
-            n_psi = n_left[0]
-            n_phi = n_right[0]
+            raise ValueError('UQpy: no data in X.')
 
         if isinstance(p, str):
 
-            # If append_X just compute the rank of the new samples.
-            if append:
-                ranks = self.ranks
-                ranks_new = []
-                for i in range(nargs_new):
-                    rnk = int(np.linalg.matrix_rank(X_new[i]))
-                    ranks.append(rnk)
-                    ranks_new.append(rnk)
-            else:
-                ranks = []
-                for i in range(nargs):
-                    ranks.append(np.linalg.matrix_rank(X[i]))
+            ranks = []
+            for i in range(nargs):
+                ranks.append(np.linalg.matrix_rank(X[i]))
 
             if p == "max":
                 # Get the maximum rank of the input matrices
@@ -213,22 +173,11 @@ class Grassmann:
             ranks = np.ones(nargs) * [int(p)]
             ranks = ranks.tolist()
 
-            if append:
-                ranks_new = np.ones(nargs_new) * [int(p)]
-                ranks_new = ranks_new.tolist()
         else:
             if p is None:
-                if append:
-                    ranks = self.ranks
-                    ranks_new = []
-                    for i in range(nargs_new):
-                        rnk = int(np.linalg.matrix_rank(X_new[i]))
-                        ranks.append(rnk)
-                        ranks_new.append(rnk)
-                else:
-                    ranks = []
-                    for i in range(nargs):
-                        ranks.append(np.linalg.matrix_rank(X[i]))
+                ranks = []
+                for i in range(nargs):
+                    ranks.append(np.linalg.matrix_rank(X[i]))
             else:
                 if not isinstance(p, int):
                     raise TypeError('UQpy: `p` must be integer.')
@@ -243,42 +192,88 @@ class Grassmann:
                 ranks = np.ones(nargs) * [int(p)]
                 ranks = ranks.tolist()
 
-                if append:
-                    ranks_new = np.ones(nargs_new) * [int(p)]
-                    ranks_new = ranks_new.tolist()
-
         ranks = list(map(int, ranks))
 
         # Singular value decomposition.
-        if append:
-            for i in range(nargs_new):
-                u, s, v = svd(X_new[i], int(ranks_new[i]))
-                self.psi.append(u)
-                self.sigma.append(np.diag(s))
-                self.phi.append(v)
-        else:
-            psi = []  # initialize the left singular eigenvectors as a list.
-            sigma = []  # initialize the singular values as a list.
-            phi = []  # initialize the right singular eigenvectors as a list.
-            for i in range(nargs):
-                u, s, v = svd(X[i], int(ranks[i]))
-                psi.append(u)
-                sigma.append(np.diag(s))
-                phi.append(v)
+        psi = []  # initialize the left singular eigenvectors as a list.
+        sigma = []  # initialize the singular values as a list.
+        phi = []  # initialize the right singular eigenvectors as a list.
+        for i in range(nargs):
+            u, s, v = svd(X[i], int(ranks[i]))
+            psi.append(u)
+            sigma.append(np.diag(s))
+            phi.append(v)
 
-            self.X = X
-            self.psi = psi
-            self.sigma = sigma
-            self.phi = phi
-
-        self.n_psi = n_psi
-        self.n_phi = n_phi
+        self.X = X
+        self.psi = psi
+        self.sigma = sigma
+        self.phi = phi
         self.p = p
         self.ranks = ranks
         self.num_X = nargs
         self.max_rank = int(np.max(ranks))
 
     # ==================================================================================================================
+    def append(self, X=None):
+
+        """
+        Append samples to the object.
+
+        :return:
+        """
+
+        # Test X for type consistency.
+        if not isinstance(X, list) and not isinstance(X, np.ndarray):
+            raise TypeError('UQpy: `X` must be either a list or numpy.ndarray.')
+        elif isinstance(X, np.ndarray):
+            X = X.tolist()
+
+        test_0 = all(X_.shape[0] == X[0].shape[0] for X_ in X)
+        test_1 = all(X_.shape[1] == X[0].shape[1] for X_ in X)
+        if not test_0:
+            raise ValueError('UQpy: elements in X must have the same dimension.')
+
+        if not test_1:
+            raise ValueError('UQpy: elements in X must have the same dimension.')
+
+        nargs_new = len(X)
+        for i in range(nargs_new):
+            self.X.append(X[i])
+
+        nargs_final = len(self.X)
+        X = self.X
+        p = self.p
+
+        ranks = self.ranks
+        ranks_new = []
+        for i in range(nargs_new):
+
+            if np.min(np.shape(X[i])):
+                rnk = int(np.linalg.matrix_rank(X[i]))
+                ranks.append(rnk)
+                ranks_new.append(rnk)
+
+        if p == "max":
+            # Get the maximum rank of the input matrices
+            p = int(max(ranks))
+        elif p == "min":
+            # Get the minimum rank of the input matrices
+            p = int(min(ranks))
+
+        ranks = np.ones(nargs_final) * [int(p)]
+        ranks = ranks.tolist()
+
+        ranks_new = np.ones(nargs_new) * [int(p)]
+        ranks_new = ranks_new.tolist()
+
+        self.ranks = list(map(int, ranks))
+
+        for i in range(nargs_new):
+            u, s, v = svd(X[i], int(ranks_new[i]))
+            self.psi.append(u)
+            self.sigma.append(np.diag(s))
+            self.phi.append(v)
+
     @staticmethod
     def log_map(points_grassmann=None, ref=None):
 
