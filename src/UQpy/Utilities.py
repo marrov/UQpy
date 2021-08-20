@@ -445,13 +445,13 @@ def _nn_coord(x, k):
     return idx
 
 
-def eigsolver(kernel_matrix, npairs):
-    n, m = np.shape(kernel_matrix)
+def eigsolver(mat, npairs):
+    n, m = np.shape(mat)
 
     if npairs > m:
         npairs = m
 
-    is_symmetric = np.allclose(kernel_matrix, np.asmatrix(kernel_matrix).H)
+    is_symmetric = np.allclose(mat, np.asmatrix(mat).H)
 
     if npairs == m:
         if is_symmetric:
@@ -475,7 +475,7 @@ def eigsolver(kernel_matrix, npairs):
             "sigma": None
         }
 
-    evals, evec = scipy_eigvec_solver(kernel_matrix, **solver_kwargs)
+    evals, evec = scipy_eigvec_solver(mat, **solver_kwargs)
     evec /= np.linalg.norm(evec, axis=0)[np.newaxis, :]
 
     return evals, evec
