@@ -1,4 +1,4 @@
-from Utilities import *
+from UQpy.Utilities import *
 
 
 class Grassmann:
