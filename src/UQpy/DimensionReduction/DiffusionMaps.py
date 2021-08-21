@@ -180,9 +180,10 @@ class DiffusionMaps:
         evecs = u[:, :n_evecs]
 
         # Compute the diffusion coordinates.
-        dcoords = np.zeros([n, n_evecs])
-        for i in range(n_evecs):
-            dcoords[:, i] = evals[i] * evecs[:, i]
+        #dcoords = np.zeros([n, n_evecs])
+        dcoords = evecs * evals
+        #for i in range(n_evecs):
+        #    dcoords[:, i] = evals[i] * evecs[:, i]
 
         # self.transition_matrix = transition_matrix
         self.dcoords = dcoords
