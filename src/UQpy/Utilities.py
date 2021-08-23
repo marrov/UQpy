@@ -445,7 +445,7 @@ def _nn_coord(x, k):
     return idx
 
 
-def eigsolver(mat, npairs):
+def eigsolver(mat, npairs, sparse=False):
     n, m = np.shape(mat)
 
     if npairs > m:
@@ -453,13 +453,15 @@ def eigsolver(mat, npairs):
 
     is_symmetric = np.allclose(mat, np.asmatrix(mat).H)
 
-    if npairs == m:
+    if not sparse:
         if is_symmetric:
             scipy_eigvec_solver = sp.linalg.eigh
         else:
             scipy_eigvec_solver = sp.linalg.eig
 
-        solver_kwargs = {"check_finite": False}
+        solver_kwargs = {"check_finite": False,
+                         "left": True,
+                         "right": False}
 
     else:  # n_eigenpairs < matrix.shape[1]
         if is_symmetric:
@@ -479,4 +481,5 @@ def eigsolver(mat, npairs):
     evec /= np.linalg.norm(evec, axis=0)[np.newaxis, :]
 
     return evals, evec
+
 
