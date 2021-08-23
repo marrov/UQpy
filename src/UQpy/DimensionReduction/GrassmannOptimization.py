@@ -38,6 +38,17 @@ class KarcherMean(Grassmann):
 
             self.X = X
 
+    def cumulative_intrinsic(self):
+        # Nearest-Neighbor Search Algorithms on Non-Euclidean Manifolds for Computer Vision Applications
+        # Approximative and recursive method.
+
+        mean_element = self.X[0]
+        for i in np.arange(1, len(self.X)):
+            gamma = self.log_map(points_grassmann=[self.X[i]], ref=np.array(mean_element)) / (i+1)
+            mean_element = self.exp_map(points_tangent=gamma, ref=np.array(mean_element))[0]
+
+        self.karcher_mean = mean_element
+
     def gradient_descent(self, **kwargs):
 
         """
@@ -281,3 +292,4 @@ class KarcherMean(Grassmann):
         frechet_var = accum / nargs
 
         return frechet_var
+
