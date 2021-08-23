@@ -141,6 +141,7 @@ class DiffusionMaps:
                 raise TypeError('UQpy: X must be a list.')
 
             self.get_kernel_matrix(**kwargs)
+
         elif kernel_matrix is not None:
             self.kernel_matrix = kernel_matrix
 
@@ -163,7 +164,9 @@ class DiffusionMaps:
         n_evecs = self.n_evecs
 
         # Find the eigenvalues and eigenvectors of ``transition_matrix``.
-        evals, evecs = eigsolver(self.transition_matrix, (n_evecs + 1))
+        evals, evecs = eigsolver(self.transition_matrix, (n_evecs + 1), self.sparse)
+        #evals, evecs_left, evecs_right = sp.linalg.eig(self.transition_matrix, left=True, right=True)
+        #evecs = evecs_left
 
         #if self.sparse:
         #    evals, evecs = spsl.eigs(self.transition_matrix, k=(n_evecs + 1), which='LR')
@@ -265,23 +268,8 @@ class DiffusionMaps:
                 raise ValueError('UQpy: Consider increasing `k_neighbors` to have a connected graph.')
 
         self.kernel_matrix = sparse_kernel_matrix = sps.csc_matrix(kernel_matrix)
-        
+
     def diffusion_distance(self, y=None):
-        """
-        This method is used to compute the diffusion distance. It uses the methods from Distances, 
-        in particular the Euclidean distance.
-        
-        **Input:**
-        
-        * **y** (`list`, `ndarray`):
-            A `list` or `ndarray` for calculation of a partial distance matrix (optional).
-            
-        **Output/Returns**
-        
-        * **diffusion_distance_matrix** (`ndarray`):
-            The distance matrix.
-            
-        """
 
         dcoords = self.dcoords
         distance_object = Distances()
