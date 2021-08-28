@@ -315,7 +315,7 @@ class Procrustes(Distances):
 class Asimov(Distances):
 
     @staticmethod
-    def projection_distance(x0, x1, **kwargs):
+    def distance(x0, x1, **kwargs):
 
         """
         Projection distance.
