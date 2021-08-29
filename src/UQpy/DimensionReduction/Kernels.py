@@ -1,4 +1,5 @@
 import scipy.spatial.distance as sd
+import numpy as np
 from UQpy.Utilities import *
 
 
