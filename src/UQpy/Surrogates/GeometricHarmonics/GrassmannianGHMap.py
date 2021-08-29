@@ -2,7 +2,7 @@ import numpy as np
 from UQpy.Utilities import *
 from UQpy.DimensionReduction.Kernels import ProjectionKernel
 from UQpy.DimensionReduction.Kernels import Gaussian
-from UQpy.Surrogates.GeometricHarmonics import GeometricHarmonics
+from UQpy.Surrogates.GeometricHarmonics.GeometricHarmonics import GeometricHarmonics
 from UQpy.DimensionReduction.Grassmann import Grassmann
 from UQpy.DimensionReduction.GrassmannianDiffusionMaps import GrassmannianDiffusionMaps
 from scipy.spatial.distance import pdist

@@ -28,7 +28,7 @@ class DiffusionMaps:
     * **k_neighbors** (`int`)
         Used when `sparse` is True to select the k samples close to a given sample in the construction
         of an sparse graph.
-        
+
     * **kernel_object** (`function`)
         A callable object used to compute the kernel matrix. Two different options are provided if no object of
         ``Grassmann`` is provided in ``fit``:
@@ -50,19 +50,19 @@ class DiffusionMaps:
     * **k_neighbors** (`int`)
         Used when `sparse` is True to select the k samples close to a given sample in the construction
         of an sparse graph.
-    
+
     * **kernel_matrix** (`ndarray`)
         Kernel matrix.
-    
+
     * **transition_matrix** (`ndarray`)
         Transition kernel of a Markov chain on the data.
-        
+
     * **dcoords** (`ndarray`)
         Diffusion coordinates
-    
+
     * **evecs** (`ndarray`)
         Eigenvectors of the transition kernel of a Markov chanin on the data.
-    
+
     * **evals** (`ndarray`)
         Eigenvalues of the transition kernel of a Markov chanin on the data.
 
@@ -164,13 +164,14 @@ class DiffusionMaps:
         n_evecs = self.n_evecs
 
         # Find the eigenvalues and eigenvectors of ``transition_matrix``.
-        evals, evecs = eigsolver(self.transition_matrix, (n_evecs + 1), self.sparse)
-        #evals, evecs_left, evecs_right = sp.linalg.eig(self.transition_matrix, left=True, right=True)
-        #evecs = evecs_left
+        evals, evecs = eigsolver(self.transition_matrix, (n_evecs + 1))
+        # evals, evecs = eigsolver(self.transition_matrix, (n_evecs + 1), self.sparse)
+        # evals, evecs_left, evecs_right = sp.linalg.eig(self.transition_matrix, left=True, right=True)
+        # evecs = evecs_left
 
-        #if self.sparse:
+        # if self.sparse:
         #    evals, evecs = spsl.eigs(self.transition_matrix, k=(n_evecs + 1), which='LR')
-        #else:
+        # else:
         #    evals, evecs = np.linalg.eig(self.transition_matrix)
 
         ix = np.argsort(np.abs(evals))
@@ -183,9 +184,9 @@ class DiffusionMaps:
         evecs = u[:, :n_evecs]
 
         # Compute the diffusion coordinates.
-        #dcoords = np.zeros([n, n_evecs])
+        # dcoords = np.zeros([n, n_evecs])
         dcoords = evecs * evals
-        #for i in range(n_evecs):
+        # for i in range(n_evecs):
         #    dcoords[:, i] = evals[i] * evecs[:, i]
 
         # self.transition_matrix = transition_matrix

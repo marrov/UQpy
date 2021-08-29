@@ -135,7 +135,7 @@ class Distances:
 
         """
 
-        raise NotImplementedError('UQpy: no kernel is implemented here.')
+        raise NotImplementedError('UQpy: no distance is implemented here.')
 
         pass
 
