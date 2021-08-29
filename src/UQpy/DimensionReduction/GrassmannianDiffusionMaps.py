@@ -1,4 +1,4 @@
-from UQpy.DimensionReduction.Kernels import Projection
+from UQpy.DimensionReduction.Kernels import ProjectionKernel
 from UQpy.DimensionReduction.DiffusionMaps import DiffusionMaps
 from UQpy.DimensionReduction.Grassmann import Grassmann
 
@@ -68,7 +68,7 @@ class GrassmannianDiffusionMaps(DiffusionMaps):
     """
 
     def __init__(self, alpha=0.5, n_evecs=2, sparse=False, k_neighbors=1, kernel_composition='prod',
-                 kernel_object=Projection(), p='max', orthogonal=False):
+                 kernel_object=ProjectionKernel(), p='max', orthogonal=False):
 
         self.kernel_object = kernel_object
         self.alpha = alpha
