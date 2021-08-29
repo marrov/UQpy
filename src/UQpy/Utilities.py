@@ -17,6 +17,7 @@
 
 import numpy as np
 import scipy.stats as stats
+import scipy as sp
 
 from UQpy.RunModel import RunModel
 
@@ -99,7 +100,6 @@ def nearest_psd(input_matrix, iterations=10):
     delta_s = 0
     psd_matrix = input_matrix.copy()
     for k in range(iterations):
-
         r_k = psd_matrix - delta_s
         x_k = _get_ps(r_k, w=w)
         delta_s = x_k - r_k
@@ -140,7 +140,7 @@ def nearest_pd(input_matrix):
     k = 1
     while not _is_pd(pd_matrix):
         min_eig = np.min(np.real(np.linalg.eigvals(pd_matrix)))
-        pd_matrix += np.eye(input_matrix.shape[0]) * (-min_eig * k**2 + spacing)
+        pd_matrix += np.eye(input_matrix.shape[0]) * (-min_eig * k ** 2 + spacing)
         k += 1
 
     return pd_matrix
@@ -305,8 +305,8 @@ def gradient(runmodel_object=None, point=None, order='first', df_step=None):
 
 
 def _bi_variate_normal_pdf(x1, x2, rho):
-    return (1 / (2 * np.pi * np.sqrt(1-rho**2)) *
-            np.exp(-1/(2*(1-rho**2)) * (x1**2 - 2 * rho * x1 * x2 + x2**2)))
+    return (1 / (2 * np.pi * np.sqrt(1 - rho ** 2)) *
+            np.exp(-1 / (2 * (1 - rho ** 2)) * (x1 ** 2 - 2 * rho * x1 * x2 + x2 ** 2)))
 
 
 # def estimate_psd(samples, nt, t):
@@ -403,7 +403,6 @@ def correlation_distortion(dist_object, rho):
 
 
 def _nn_coord(x, k):
-    
     """
     Select k elements close to x.
 
@@ -414,7 +413,7 @@ def _nn_coord(x, k):
 
     :param x: Matrices to be tested.
     :type  x: list or numpy array
-    
+
     :param k: Number of points close to x.
     :type  k: int
 
@@ -423,45 +422,55 @@ def _nn_coord(x, k):
     :return idx: Indices of the closer points.
     :rtype  idx: int
     """
-        
+
     if isinstance(x, list):
         x = np.array(x)
-        
+
     dim = np.shape(x)
-    
+
     if len(dim) is not 1:
         raise ValueError('k MUST be a vector.')
-    
+
     if not isinstance(k, int):
         raise TypeError('k MUST be integer.')
 
     if k < 1:
         raise ValueError('k MUST be larger than or equal to 1.')
-    
+
     # idx = x.argsort()[::-1][:k]
-    idx = x.argsort()[:len(x)-k]
+    idx = x.argsort()[:len(x) - k]
     # idx = idx[0:k]
     # idx = idx[k+1:]
     return idx
 
 
-def eigsolver(mat, npairs, sparse=False):
-    n, m = np.shape(mat)
+# def eigsolver(mat, npairs, sparse=False):
+def eigsolver(kernel_matrix, n_evecs):
+    n_rows, n_cols = kernel_matrix.shape
+    if n_evecs is None:
+        n_evecs = int(n_cols)
 
-    if npairs > m:
-        npairs = m
+    if not isinstance(n_evecs, int):
+        raise TypeError('UQpy: `n_evecs` must be integer.')
 
-    is_symmetric = np.allclose(mat, np.asmatrix(mat).H)
+    if n_evecs < 1:
+        raise ValueError('UQpy: `n_evecs` must be larger than or equal to 1.')
 
-    if not sparse:
+    if n_evecs > n_cols:
+        n_evecs = n_cols
+
+    is_symmetric = np.allclose(kernel_matrix, np.asmatrix(kernel_matrix).H)
+
+    # check only for n_eigenpairs == n_features and n_eigenpairs < n_features
+    # wrong parametrized n_eigenpairs are catched in scipy functions
+
+    if n_evecs == n_cols:
         if is_symmetric:
             scipy_eigvec_solver = sp.linalg.eigh
         else:
             scipy_eigvec_solver = sp.linalg.eig
 
-        solver_kwargs = {"check_finite": False,
-                         "left": True,
-                         "right": False}
+        solver_kwargs = {"check_finite": False}
 
     else:  # n_eigenpairs < matrix.shape[1]
         if is_symmetric:
@@ -470,16 +479,19 @@ def eigsolver(mat, npairs, sparse=False):
             scipy_eigvec_solver = sp.sparse.linalg.eigs
 
         solver_kwargs = {
-            "k": npairs,
+            "sigma": None,
+            "k": n_evecs,
             "which": "LM",
-            "v0": np.ones(n),
+            "v0": np.ones(n_rows),
             "tol": 1e-14,
-            "sigma": None
         }
 
-    evals, evec = scipy_eigvec_solver(mat, **solver_kwargs)
-    evec /= np.linalg.norm(evec, axis=0)[np.newaxis, :]
+        # solver_kwargs["sigma"] = None
 
-    return evals, evec
+    eigvals, eigvects = scipy_eigvec_solver(kernel_matrix, **solver_kwargs)
+
+    eigvects /= np.linalg.norm(eigvects, axis=0)[np.newaxis, :]
+
+    return eigvals, eigvects
 
 
