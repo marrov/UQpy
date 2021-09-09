@@ -42,6 +42,7 @@ from UQpy.SampleMethods.RSS import *
 from UQpy.SampleMethods.STS import *
 from UQpy.SampleMethods.MCMC import *
 from UQpy.SampleMethods.Strata import *
+from UQpy.SampleMethods.TemperingMCMC import *
 
 from . import (
     MCMC, RSS, STS, Strata
