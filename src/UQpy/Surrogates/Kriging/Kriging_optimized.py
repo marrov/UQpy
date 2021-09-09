@@ -28,6 +28,7 @@ The module currently contains the following classes:
 
 import numpy as np
 import scipy.stats as stats
+from scipy.linalg import solve_triangular, cholesky
 from UQpy.Distributions import Normal, Uniform, DistributionContinuous1D, JointInd
 import scipy.integrate as integrate
 import scipy.special as special
@@ -42,7 +43,7 @@ warnings.filterwarnings("ignore")
 ########################################################################################################################
 ########################################################################################################################
 
-class Kriging:
+class Kriging_op:
     """
     Kriging generates an Gaussian process regression-based surrogate model to predict the model output at new sample
     points.
@@ -187,8 +188,6 @@ class Kriging:
         ``Kriging`` class.
 
         """
-        from scipy.linalg import cholesky
-
         if self.verbose:
             print('UQpy: Running Kriging.fit')
 
@@ -206,13 +205,10 @@ class Kriging:
             if np.prod(np.diagonal(cc)) == 0:
                 return np.inf, np.zeros(n)
 
-            cc_inv = np.linalg.inv(cc)
-
-            a =cc_inv.T
-            #r_inv = np.matmul(cc_inv.T, cc_inv)
-            r_inv = cc_inv.T.dot(cc_inv)
-            f__ = cc_inv.dot(f)
-            y__ = cc_inv.dot(y)
+            f__ = np.zeros_like(f)
+            for f__col in range(f__.shape[1]):
+                f__[:, f__col] = solve_triangular(cc, f[:, f__col], lower=True)
+            y__ = solve_triangular(cc, y, lower=True)
 
             q__, g__ = np.linalg.qr(f__)  # Eq: 3.11, DACE
 
@@ -235,17 +231,16 @@ class Kriging:
             # Gradient of loglikelihood
             # Reference: C. E. Rasmussen & C. K. I. Williams, Gaussian Processes for Machine Learning, the MIT Press,
             # 2006, ISBN 026218253X. (Page 114, Eq.(5.9))
-            residual = y - np.matmul(f, beta_)
-            gamma = np.matmul(r_inv, residual)
+            # residual = y - np.matmul(f, beta_)
+            # gamma = solve_triangular(cc.T, solve_triangular(cc, residual, lower=True))
             grad_mle = np.zeros(n)
             for in_dim in range(n):
-                r_inv_derivative = np.matmul(r_inv, np.matmul(dr_[:, :, in_dim], r_inv))
-                tmp = np.matmul(residual.T, np.matmul(r_inv_derivative, residual))
+                r_inv_times_dr = np.zeros_like(dr_[:, :, in_dim])
                 for out_dim in range(y.shape[1]):
-                    alpha = gamma / sigma_[out_dim]
-                    tmp1 = np.matmul(alpha, alpha.T) - r_inv / sigma_[out_dim]
-                    cov_der = sigma_[out_dim] * dr_[:, :, in_dim] + tmp * r__ / m
-                    grad_mle[in_dim] = grad_mle[in_dim] - 0.5 * np.trace(np.matmul(tmp1, cov_der))
+                    for dr_col in range(dr_.shape[1]):
+                        r_inv_times_dr[:, dr_col] = solve_triangular(cc.T, solve_triangular(cc, dr_[:, dr_col, in_dim],
+                                                                                            lower=True))
+                    grad_mle[in_dim] = grad_mle[in_dim] - 0.5 * np.trace(r_inv_times_dr)
 
             return ll, grad_mle
 
