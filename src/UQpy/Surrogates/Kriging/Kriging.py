@@ -193,8 +193,7 @@ class Kriging:
             for out_dim in range(y.shape[1]):
                 sigma_[out_dim] = (1 / m) * (np.linalg.norm(y__[:, out_dim] - np.matmul(f__, beta_[:, out_dim])) ** 2)
                 # Objective function:= log(det(sigma**2 * R)) + constant
-                sign, logdet = np.linalg.slogdet(sigma_[out_dim] * r__)
-                ll = ll + (np.log(sign * np.exp(logdet)) + m * (np.log(2 * np.pi) + 1))/2
+                ll = ll + (np.log(np.linalg.det(sigma_[out_dim] * r__)) + m * (np.log(2 * np.pi) + 1)) / 2
 
             # Gradient of loglikelihood
             # Reference: C. E. Rasmussen & C. K. I. Williams, Gaussian Processes for Machine Learning, the MIT Press,
